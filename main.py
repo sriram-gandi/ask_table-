@@ -46,7 +46,7 @@ def main() -> None:
 
     print("\n=== AskTable AI Analysis ===")
     print(f"Analysis type: {result.get('analysis_type')}")
-    print(f"Answer: {result.get('response')}")
+    print(f"Answer: {result.get('final_answer')}")
     print(f"Error: {result.get('error')}")
 
     if (
