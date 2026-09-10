@@ -1,176 +1,255 @@
+# AskTable AI
 
-AskTable AI lets you upload CSV or Excel files and query them in plain English. No SQL knowledge required. You type something like *"Compare sales across regions"* and the app figures out what to query, runs it, and hands you back an answer � along with a chart if it makes sense to show one.
+> **Ask questions about CSV and Excel data in plain English — no SQL required.**
 
-Under the hood it's a multi-agent pipeline powered by Google's Gemini model, stitched together with LangGraph, and backed by DuckDB for blazing-fast in-process SQL. The UI is built in Streamlit and there's also a thin FastAPI bridge if you want to wire it up to a custom frontend.
+AskTable AI is an agentic data-analysis application that turns natural-language questions into validated DuckDB queries, executes them across uploaded datasets, explains the results, and generates a visualization when one adds value.
 
+## Why this project?
 
-## What it can do
+Traditional analytics tools require users to know SQL, understand schemas, and manually build charts. AskTable AI puts an agentic layer over tabular data so users can start with the question instead of the query language.
 
-- Upload multiple CSV / Excel files in one go
-- Ask natural-language questions across one or more of those datasets
-- Get a written answer plus the raw data table
-- Automatically decide when a chart is actually useful and render one (via Plotly)
-- Expose the same logic through a REST API (`/ingest`, `/analyze`, `/chart`)
+## Core capabilities
 
----
+- 📁 Upload multiple CSV and Excel files
+- 🔎 Select the datasets relevant to a question
+- 🤖 Use specialized agents for analysis, response generation, and visualization
+- 🧠 Generate SQL from natural-language questions
+- 🛡️ Preprocess and validate generated SQL before execution
+- ⚡ Execute analytical queries locally with DuckDB
+- 📊 Generate Plotly visualizations conditionally
+- 💬 Return both a human-readable answer and query results
+- 🔌 Expose the same service layer through Streamlit and FastAPI
 
-## How it works
+## Architecture
 
-The pipeline is a LangGraph state machine. Each step is a dedicated agent:
-
+```text
+                         ┌─────────────────────┐
+                         │       User          │
+                         │  Files + Question   │
+                         └──────────┬──────────┘
+                                    │
+                         ┌──────────▼──────────┐
+                         │ Streamlit / FastAPI │
+                         └──────────┬──────────┘
+                                    │
+                         ┌──────────▼──────────┐
+                         │   Analysis Service  │
+                         └──────────┬──────────┘
+                                    │
+                    ┌───────────────▼───────────────┐
+                    │      LangGraph Orchestrator   │
+                    └───────────────┬───────────────┘
+                                    │
+          ┌─────────────────────────┼─────────────────────────┐
+          │                         │                         │
+ ┌────────▼────────┐      ┌────────▼────────┐      ┌────────▼────────┐
+ │ File Selector    │      │ Analysis Agent  │      │ Response Agent  │
+ │ Agent            │      │                 │      │                 │
+ └─────────────────┘      └────────┬────────┘      └─────────────────┘
+                                   │
+                          ┌────────▼────────┐
+                          │ SQL Processing  │
+                          └────────┬────────┘
+                                   │
+                          ┌────────▼────────┐
+                          │ DuckDB Executor │
+                          └────────┬────────┘
+                                   │
+                          ┌────────▼────────┐
+                          │ Query Result    │
+                          └────────┬────────┘
+                                   │
+                          ┌────────▼────────┐
+                          │ Visualization   │
+                          │ Agent (optional)│
+                          └─────────────────┘
 ```
-Upload files
-     |
-     V
-[File Selector Agent]  -> picks which tables are relevant to the question
-     |
-     V
-[Analysis Agent]       -> decides analysis type, generates DuckDB SQL,visualization_required or not and reason
-     |
-     V
-[SQL Preprocessor]     -> cleans / validates the generated SQL
-     |
-     V
-[Query Executor]       -> runs SQL against DuckDB, returns a DataFrame
-     |
-     V
-[Response Agent]       -> writes a human-readable answer
-     |
-     V
-[Visualization Agent]  -> (conditional) creates a Plotly chart spec
 
+### Agent responsibilities
 
-Every uploaded file lands in a local DuckDB database. Column-level metadata (types, unique counts, sample values) is stored alongside it so the agents have enough context to generate accurate SQL without hallucinating column names.
-
----
+| Component | Responsibility |
+|---|---|
+| File Selector Agent | Determines which uploaded datasets are relevant |
+| Analysis Agent | Plans the analysis and generates SQL |
+| SQL processing | Cleans and validates generated SQL before execution |
+| Query Executor | Runs SQL against DuckDB |
+| Response Agent | Converts query results into a useful explanation |
+| Visualization Agent | Decides whether a chart is useful and creates its specification |
 
 ## Tech stack
 
-| Layer | Tech |
+| Layer | Technology |
 |---|---|
-| LLM | Google Gemini 2.5 Flash via `langchain-google-genai` |
+| LLM | Google Gemini 2.5 Flash |
 | Agent orchestration | LangGraph |
-| Database | DuckDB (in-process, no server needed) |
-| UI | Streamlit |
-| REST API | FastAPI |
-| Charts | Plotly |
-| Data handling | Pandas |
-| Schema validation | Pydantic |
-| Config | python-dotenv |
+| LLM integration | LangChain Google GenAI |
+| Analytical database | DuckDB |
+| Data processing | Pandas |
+| Visualization | Plotly |
+| Web UI | Streamlit |
+| API | FastAPI + Uvicorn |
+| Validation | Pydantic |
+| Configuration | python-dotenv |
 
+## Project structure
 
+```text
+.
+├── app/
+│   ├── agents/
+│   │   ├── analysis_agent.py
+│   │   ├── file_selector.py
+│   │   ├── orchestrator.py
+│   │   ├── response_agent.py
+│   │   ├── state.py
+│   │   └── visualization_agent.py
+│   ├── core/
+│   │   └── dependencies.py
+│   ├── database/
+│   │   └── duckdb_manager.py
+│   ├── ingestion/
+│   ├── services/
+│   │   ├── analysis_service.py
+│   │   ├── chart_service.py
+│   │   └── ingestion_service.py
+│   └── utils/
+├── ui/
+│   └── streamlit.py
+├── api_bridge.py
+├── main.py
+├── requirements.txt
+└── .env.example
+```
 
-## Project layout
+## Getting started
 
+### Prerequisites
 
-ask_table_v1/
-+-- main.py                   # Script entrypoint (demo purpose only)
-+-- api_bridge.py             # FastAPI REST bridge
-+-- .env                      # API keys (not committed)
-+-- requirements.txt
-|
-+-- app/
-|   +-- agents/
-|   |   +-- orchestrator.py   # LangGraph state machine
-|   |   +-- analysis_agent.py # SQL generation + analysis planning
-|   |   +-- file_selector.py  # Picks relevant datasets
-|   |   +-- visualization_agent.py # generates chart spec
-|   |   +-- response_agent.py # generates actual response
-|   |   +-- state.py          # Shared state schema
-|
-|       +-- core/
-|       +-- dependencies.py   # Factory functions (LLM, services)
+- Python 3.10+
+- A Google Gemini API key
 
-   
-|   +-- database/
-|       +-- duckdb_manager.py # All DuckDB operations
-|   
-|   +-- services/
-|       +-- ingestion_service.py
-|       +-- analysis_service.py
-|       +-- chart_service.py
-|
-+-- ui/
-|   +-- streamlit.py          # Main Streamlit app
-|
-+-- data/                     # Drop your CSV / Excel files here
-
-
-## Setup
-
-### 1. Clone the repo
+### 1. Clone
 
 ```bash
-git clone <your-repo-url>
-cd ask_table_v1
+git clone https://github.com/sriram-gandi/ask_table-.git
+cd ask_table-
 ```
 
 ### 2. Create a virtual environment
 
 ```bash
-python -m venv venv
+python -m venv .venv
 
 # Windows
-venv\Scripts\activate
+.venv\Scripts\activate
 
-# Mac / Linux
-source venv/bin/activate
+# macOS / Linux
+source .venv/bin/activate
 ```
 
 ### 3. Install dependencies
 
-The `requirements.txt` is currently empty � install everything you need:
+```bash
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+```
+
+### 4. Configure the API key
 
 ```bash
-pip install streamlit langchain-google-genai langgraph duckdb pandas \
-            plotly pydantic python-dotenv fastapi uvicorn openpyxl
+copy .env.example .env
 ```
 
-> **Tip:** Pin these versions once things are stable and commit a proper `requirements.txt`.
+On macOS/Linux:
 
-### 4. Set your Google API key
-
-Create a `.env` file in the project root (or edit the existing one):
-
-```
-GOOGLE_API_KEY=your_key_here
+```bash
+cp .env.example .env
 ```
 
-You can get a key from [Google AI Studio](https://aistudio.google.com/). The app uses **Gemini 2.5 Flash** � make sure your key has access to it.
+Set your key in `.env`:
 
+```env
+GOOGLE_API_KEY=your_gemini_api_key
+```
 
-### 5. Run the Streamlit app
+**Never commit `.env` or API keys.**
+
+### 5. Run the application
 
 ```bash
 streamlit run ui/streamlit.py
 ```
 
-Open `http://localhost:8501` in your browser. Upload some CSVs, select datasets, type a question, hit **Analyze**.
+The Streamlit application will be available at `http://localhost:8501`.
 
-### 6. (Optional) Run the CLI demo
-
-If you want to test the pipeline without the UI:
+### Optional: run the CLI example
 
 ```bash
 python main.py
 ```
 
-This ingests `data/customers.csv`, `data/orders.csv`, and `data/products.csv` and runs a hardcoded question. Drop your own files in the `data/` folder first.
+The CLI example demonstrates the complete ingestion → agent orchestration → SQL → result → visualization flow.
 
+## API
 
-The API exposes three endpoints:
+The project also includes a FastAPI bridge for integrating the analysis pipeline with another frontend or service.
 
-| Method | Path | What it does |
+| Method | Endpoint | Purpose |
 |---|---|---|
-| `POST` | `/ingest` | Upload files (multipart form) |
-| `POST` | `/analyze` | Send a question + file IDs, get back a result |
-| `POST` | `/chart` | Generate a Plotly chart from a result |
+| `POST` | `/ingest` | Upload datasets |
+| `POST` | `/analyze` | Ask a question about selected datasets |
+| `POST` | `/chart` | Generate a chart from an analysis result |
 
+## Design decisions
 
+### Why DuckDB?
 
-## Things worth knowing
+DuckDB provides an embedded analytical SQL engine without requiring a separate database server. This keeps the application lightweight while making relational analysis over uploaded files fast and reproducible.
 
-- DuckDB stores its database at `data/analytics.duckdb`. Delete this file if you want a fresh start.
-- The Streamlit app keeps services in `st.session_state`, so everything persists across rerenders within a session.
-- The FastAPI bridge reuses the exact same service layer as the Streamlit app no duplicated business logic.
-- The visualization agent only produces a chart when it genuinely makes sense (comparisons, trends, distributions). Single-value answers just get a text response.
+### Why LangGraph?
+
+The analysis workflow has explicit stages and conditional execution. LangGraph makes those state transitions visible and gives each specialized agent a well-defined responsibility rather than relying on a single unconstrained prompt.
+
+### Why conditional visualization?
+
+Not every analytical question benefits from a chart. AskTable AI separates visualization planning from answer generation so a visualization is produced only when the result supports a useful visual representation.
+
+## Security and data handling
+
+- API credentials are loaded from environment variables.
+- Local uploaded datasets and DuckDB files are excluded from Git.
+- No secrets should be committed to the repository.
+- Uploaded data is processed locally by the application unless the configured LLM provider receives the information as part of an LLM request.
+
+## Development
+
+Before opening a pull request, run:
+
+```bash
+python -m compileall app ui api_bridge.py main.py
+```
+
+For linting and tests in development environments:
+
+```bash
+pip install ruff pytest
+ruff check .
+pytest
+```
+
+## Roadmap
+
+- [ ] Add automated unit and integration tests
+- [ ] Add SQL safety and query-cost guardrails
+- [ ] Add structured observability/tracing for agent runs
+- [ ] Add authentication and request-level isolation to the API
+- [ ] Add deployment configuration
+- [ ] Add evaluation datasets for SQL-generation accuracy
+
+## Status
+
+This project is an actively developed portfolio/reference implementation of an agentic analytics workflow. Interfaces and architecture may evolve as evaluation, testing, and production hardening are added.
+
+## License
+
+Add a license before treating this repository as a reusable open-source project.
