@@ -1,24 +1,24 @@
-# Core LLM & agent framework
+# LLM & agent orchestration
 langchain-google-genai
 langgraph
 
-# Database
+# Data & analytical database
 duckdb
+pandas
+openpyxl
 
-# UI
+# Visualization
+plotly
+
+# Application
 streamlit
-
-# REST API
 fastapi
 uvicorn
 
-# Data & charts
-pandas
-plotly
-openpyxl
-
-# Schema validation
+# Validation & configuration
 pydantic
-
-# Config / env
 python-dotenv
+
+# Development
+ruff
+pytest
